@@ -239,7 +239,7 @@ for _, category in pairs(ToolsFolder:GetChildren()) do
 end
 
 ---------------------------------------------------------------------
--- PLANTS TAB (CLEAN LAYOUT)
+-- PLANTS TAB (AUTO PLANT + SEARCH BUY)
 ---------------------------------------------------------------------
 
 local TabPlants = Window:Tab({
@@ -259,10 +259,10 @@ local PurchaseRemote = ReplicatedStorage.RemoteEvents:WaitForChild("PurchaseShop
 local PlantRemote = ReplicatedStorage.RemoteEvents:WaitForChild("PlantSeed")
 
 ---------------------------------------------------------------------
--- AUTO PLANTER (ONLY ONCE)
+-- AUTO PLANTER (AUTO RUNNING)
 ---------------------------------------------------------------------
 
-local AutoPlant = false
+local AutoPlant = true
 local AutoPlantDelay = 1
 
 local PlanterBox = PlantSection:Section({
@@ -286,7 +286,7 @@ local function GetPlantPosition()
     local hrp = char:FindFirstChild("HumanoidRootPart")
     if not hrp then return end
 
-    return Vector3.new(hrp.Position.X, 185.6, hrp.Position.Z)
+    return Vector3.new(hrp.Position.X,185.6,hrp.Position.Z)
 end
 
 local function PlantOnce()
@@ -296,32 +296,24 @@ local function PlantOnce()
     local pos = GetPlantPosition()
     if not pos then return end
 
-    PlantRemote:InvokeServer(plantName, pos)
+    PlantRemote:InvokeServer(plantName,pos)
 end
 
-PlanterBox:Button({
-    Title = "Plant Held Seed",
-    Justify = "Center",
-    Callback = function()
-        pcall(PlantOnce)
+-- AUTO LOOP STARTS IMMEDIATELY
+task.spawn(function()
+    while true do
+        if AutoPlant then
+            pcall(PlantOnce)
+        end
+        task.wait(AutoPlantDelay)
     end
-})
-
-PlanterBox:Space()
+end)
 
 PlanterBox:Toggle({
-    Title = "Auto Planter",
+    Title = "Auto Planter Enabled",
+    Value = true,
     Callback = function(state)
         AutoPlant = state
-
-        if AutoPlant then
-            task.spawn(function()
-                while AutoPlant do
-                    pcall(PlantOnce)
-                    task.wait(AutoPlantDelay)
-                end
-            end)
-        end
     end
 })
 
@@ -339,55 +331,89 @@ PlanterBox:Slider({
 })
 
 ---------------------------------------------------------------------
--- PLANT BUY SECTIONS (LOOP)
+-- SEARCH BAR
 ---------------------------------------------------------------------
 
-for _, plant in pairs(PlantsFolder:GetChildren()) do
+local SearchQuery = ""
 
-    local plantName = plant.Name
+PlantSection:Input({
+    Title = "Search Plant",
+    Placeholder = "Type plant name...",
+    Callback = function(text)
+        SearchQuery = string.lower(text or "")
+        RefreshPlants()
+    end
+})
 
-    local PlantBox = PlantSection:Section({
-        Title = plantName,
-        Box = true,
-        Opened = false,
-    })
+---------------------------------------------------------------------
+-- PLANT LIST CONTAINER
+---------------------------------------------------------------------
 
-    local amount = 1
-    local autoBuy = false
+local PlantBoxes = {}
 
-    PlantBox:Slider({
-        Title = "Amount",
-        Step = 1,
-        Value = { Min = 1, Max = 50, Default = 1 },
-        Callback = function(v)
-            amount = v
+function RefreshPlants()
+
+    for _,box in pairs(PlantBoxes) do
+        box:Destroy()
+    end
+
+    table.clear(PlantBoxes)
+
+    for _, plant in pairs(PlantsFolder:GetChildren()) do
+
+        local plantName = plant.Name
+
+        if SearchQuery ~= "" and not string.find(string.lower(plantName),SearchQuery) then
+            continue
         end
-    })
 
-    PlantBox:Button({
-        Title = "Buy Seed",
-        Justify = "Center",
-        Callback = function()
-            for i = 1, amount do
-                PurchaseRemote:InvokeServer("SeedShop", plantName.." Seed")
-                task.wait(0.15)
+        local amount = 1
+        local autoBuy = false
+
+        local PlantBox = PlantSection:Section({
+            Title = plantName,
+            Box = true,
+            Opened = false,
+        })
+
+        table.insert(PlantBoxes,PlantBox)
+
+        PlantBox:Slider({
+            Title = "Amount",
+            Step = 1,
+            Value = {Min=1,Max=50,Default=1},
+            Callback = function(v)
+                amount = v
             end
-        end
-    })
+        })
 
-    PlantBox:Toggle({
-        Title = "Auto Buy",
-        Callback = function(state)
-            autoBuy = state
-            if autoBuy then
-                task.spawn(function()
-                    while autoBuy do
-                        PurchaseRemote:InvokeServer("SeedShop", plantName.." Seed")
-                        task.wait(1)
-                    end
-                end)
+        PlantBox:Button({
+            Title = "Buy Seed",
+            Justify = "Center",
+            Callback = function()
+                for i=1,amount do
+                    PurchaseRemote:InvokeServer("SeedShop",plantName.." Seed")
+                    task.wait(0.15)
+                end
             end
-        end
-    })
+        })
 
+        PlantBox:Toggle({
+            Title = "Auto Buy",
+            Callback = function(state)
+                autoBuy = state
+                if autoBuy then
+                    task.spawn(function()
+                        while autoBuy do
+                            PurchaseRemote:InvokeServer("SeedShop",plantName.." Seed")
+                            task.wait(1)
+                        end
+                    end)
+                end
+            end
+        })
+    end
 end
+
+-- FIRST BUILD
+RefreshPlants()
