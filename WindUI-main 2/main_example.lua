@@ -1,8 +1,35 @@
---[[
-    WindUI Example 
+--// Sell Tab
+local TabSell = Window:Tab({
+    Title = "Sell",
+    Icon = "solar:tag-price-bold",
+})
 
-    example moved to main.client.lua
-]]
+TabSell:Section({
+    Title = "Sell Items",
+    Desc = "Quick sell actions",
+})
 
+local SellGroup = TabSell:Group()
 
-loadstring(game:HttpGet('https://raw.githubusercontent.com/Footagesus/WindUI/refs/heads/main/main.client.lua'))()
+SellGroup:Button({
+    Title = "Sell All",
+    Justify = "Center",
+    Icon = "solar:cart-large-2-bold",
+    IconAlign = "Left",
+    Size = "Small",
+    Callback = function()
+        local args = {
+            "SellAll"
+        }
+
+        game:GetService("ReplicatedStorage")
+            :WaitForChild("RemoteEvents")
+            :WaitForChild("SellItems")
+            :InvokeServer(unpack(args))
+
+        WindUI:Notify({
+            Title = "Sell",
+            Content = "SellAll invoked"
+        })
+    end,
+})
