@@ -1,68 +1,123 @@
---// Sell Tab
+--// Load Services
+local cloneref = (cloneref or clonereference or function(i) return i end)
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
+local RunService = cloneref(game:GetService("RunService"))
+
+--// Load WindUI
+local WindUI
+do
+    local ok, result = pcall(function()
+        return require("./src/Init")
+    end)
+
+    if ok then
+        WindUI = result
+    else
+        if RunService:IsStudio() then
+            WindUI = require(ReplicatedStorage:WaitForChild("WindUI"):WaitForChild("Init"))
+        else
+            WindUI = loadstring(game:HttpGet(
+                "https://raw.githubusercontent.com/Footagesus/WindUI/main/dist/main.lua"
+            ))()
+        end
+    end
+end
+
+---------------------------------------------------------------------
+-- WINDOW
+---------------------------------------------------------------------
+
+local Window = WindUI:CreateWindow({
+    Title = "Sell Hub",
+    Icon = "solar:tag-price-bold",
+    Folder = "SellHub",
+    NewElements = true,
+    HideSearchBar = false,
+})
+
+---------------------------------------------------------------------
+-- SELL TAB (ONLY TAB)
+---------------------------------------------------------------------
+
 local TabSell = Window:Tab({
     Title = "Sell",
-    Icon = "solar:tag-price-bold",
+    Icon = "solar:cart-large-2-bold",
 })
 
-TabSell:Section({
-    Title = "Selling",
-    Desc = "Manual and automatic selling",
+local SellSection = TabSell:Section({
+    Title = "Auto Selling",
 })
 
-local SellGroup = TabSell:Group()
+---------------------------------------------------------------------
+-- VARIABLES
+---------------------------------------------------------------------
 
---// variables
 local AutoSell = false
 local AutoSellDelay = 5
-local SellingThread
+local AutoSellThread
 
---// function to invoke sell
+---------------------------------------------------------------------
+-- SELL FUNCTION
+---------------------------------------------------------------------
+
 local function SellAll()
-    local args = {"SellAll"}
-    game:GetService("ReplicatedStorage")
+    local args = { "SellAll" }
+
+    ReplicatedStorage
         :WaitForChild("RemoteEvents")
         :WaitForChild("SellItems")
         :InvokeServer(unpack(args))
 end
 
---// Manual Sell Button
-SellGroup:Button({
+---------------------------------------------------------------------
+-- BUTTON : SELL ALL
+---------------------------------------------------------------------
+
+SellSection:Button({
     Title = "Sell All",
     Justify = "Center",
     Icon = "solar:cart-large-2-bold",
-    IconAlign = "Left",
-    Size = "Small",
     Callback = function()
-        SellAll()
+        pcall(SellAll)
+
         WindUI:Notify({
             Title = "Sell",
             Content = "SellAll invoked"
         })
-    end,
+    end
 })
 
-SellGroup:Space({Columns = 1})
+SellSection:Space()
 
---// Auto Sell Toggle
-SellGroup:Toggle({
+---------------------------------------------------------------------
+-- TOGGLE : AUTO SELL
+---------------------------------------------------------------------
+
+SellSection:Toggle({
     Title = "Auto Sell",
     Value = false,
     Callback = function(state)
         AutoSell = state
 
         if AutoSell then
-            SellingThread = task.spawn(function()
+            if AutoSellThread then return end
+
+            AutoSellThread = task.spawn(function()
                 while AutoSell do
-                    SellAll()
+                    pcall(SellAll)
                     task.wait(AutoSellDelay)
                 end
+                AutoSellThread = nil
             end)
         end
-    end,
+    end
 })
 
---// Auto Sell Delay Slider
-SellGroup:Slider({
+---------------------------------------------------------------------
+-- SLIDER : DELAY
+---------------------------------------------------------------------
+
+SellSection:Slider({
     Title = "Auto Sell Delay",
     Step = 1,
     Value = {
