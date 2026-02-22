@@ -145,7 +145,7 @@ local GearSection = TabGears:Section({
 
 -- load GearDefinitions module
 local GearModule = require(
-    ReplicatedStorage:WaitForChild("Definitions"):WaitForChild("GearDefinitions")
+    ReplicatedStorage::WaitForChild("Gears"):WaitForChild("Definitions"):WaitForChild("GearDefinitions")
 )
 
 local GearList = GearModule.Gears
