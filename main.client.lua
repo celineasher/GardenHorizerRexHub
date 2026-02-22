@@ -239,7 +239,7 @@ for _, category in pairs(ToolsFolder:GetChildren()) do
 end
 
 ---------------------------------------------------------------------
--- PLANTS TAB (AUTO SEED BUYER)
+-- PLANTS TAB (CLEAN LAYOUT)
 ---------------------------------------------------------------------
 
 local TabPlants = Window:Tab({
@@ -251,151 +251,43 @@ local PlantSection = TabPlants:Section({
     Title = "Seed Shop",
 })
 
-local PlantsFolder = ReplicatedStorage
-    :WaitForChild("Plants")
-    :WaitForChild("Models")
-
-local PurchaseRemote = ReplicatedStorage
-    :WaitForChild("RemoteEvents")
-    :WaitForChild("PurchaseShopItem")
-
----------------------------------------------------------------------
--- SETTINGS
----------------------------------------------------------------------
-
-local AutoBuyPlant = {}
-local BuyPlantAmount = {}
-
-local function BuySeed(plantName, amount)
-    local seedName = plantName .. " Seed"
-
-    for i = 1, amount do
-        PurchaseRemote:InvokeServer("SeedShop", seedName)
-        task.wait(0.15)
-    end
-end
-
----------------------------------------------------------------------
--- CREATE UI FROM PLANT MODELS
----------------------------------------------------------------------
-
-for _, plant in pairs(PlantsFolder:GetChildren()) do
-
-    local plantName = plant.Name
-    AutoBuyPlant[plantName] = false
-    BuyPlantAmount[plantName] = 1
-
-    local PlantBox = PlantSection:Section({
-        Title = plantName,
-        Box = true,
-        Opened = false,
-    })
-
-    -----------------------------------------------------------------
-    -- AMOUNT
-    -----------------------------------------------------------------
-
-    PlantBox:Slider({
-        Title = "Amount",
-        Step = 1,
-        Value = {
-            Min = 1,
-            Max = 50,
-            Default = 1,
-        },
-        Callback = function(v)
-            BuyPlantAmount[plantName] = v
-        end
-    })
-
-    PlantBox:Space()
-
-    -----------------------------------------------------------------
-    -- BUY ONCE
-    -----------------------------------------------------------------
-
-    PlantBox:Button({
-        Title = "Buy Seed",
-        Justify = "Center",
-        Callback = function()
-            BuySeed(plantName, BuyPlantAmount[plantName])
-        end
-    })
-
-    PlantBox:Space()
-
-    -----------------------------------------------------------------
-    -- AUTO BUY
-    -----------------------------------------------------------------
-
-    PlantBox:Toggle({
-        Title = "Auto Buy",
-        Callback = function(state)
-            AutoBuyPlant[plantName] = state
-
-            if state then
-                task.spawn(function()
-                    while AutoBuyPlant[plantName] do
-                        BuySeed(plantName, BuyPlantAmount[plantName])
-                        task.wait(1)
-                    end
-                end)
-            end
-        end
-    })
-    ---------------------------------------------------------------------
--- AUTO PLANTER
----------------------------------------------------------------------
-
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 
-local PlantRemote = ReplicatedStorage
-    :WaitForChild("RemoteEvents")
-    :WaitForChild("PlantSeed")
+local PlantsFolder = ReplicatedStorage:WaitForChild("Plants"):WaitForChild("Models")
+local PurchaseRemote = ReplicatedStorage.RemoteEvents:WaitForChild("PurchaseShopItem")
+local PlantRemote = ReplicatedStorage.RemoteEvents:WaitForChild("PlantSeed")
+
+---------------------------------------------------------------------
+-- AUTO PLANTER (ONLY ONCE)
+---------------------------------------------------------------------
 
 local AutoPlant = false
 local AutoPlantDelay = 1
 
----------------------------------------------------------------------
--- GET CURRENT TOOL / PLANT NAME
----------------------------------------------------------------------
+local PlanterBox = PlantSection:Section({
+    Title = "Auto Planter",
+    Box = true,
+    Opened = true,
+})
 
 local function GetHeldPlant()
     local char = LocalPlayer.Character
-    if not char then return nil end
-
+    if not char then return end
     local tool = char:FindFirstChildOfClass("Tool")
-    if not tool then return nil end
-
-    -- removes " Seed" if tool is a seed
-    local name = tool.Name:gsub(" Seed","")
-    return name
+    if not tool then return end
+    return tool.Name:gsub(" Seed","")
 end
-
----------------------------------------------------------------------
--- GET PLANT POSITION (PLAYER X/Z ONLY)
----------------------------------------------------------------------
 
 local function GetPlantPosition()
     local char = LocalPlayer.Character
-    if not char then return nil end
+    if not char then return end
 
     local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil end
+    if not hrp then return end
 
-    local x = hrp.Position.X
-    local z = hrp.Position.Z
-
-    -- keep same Y used in your example
-    local groundY = 185.5998077392578
-
-    return Vector3.new(x, groundY, z)
+    return Vector3.new(hrp.Position.X, 185.6, hrp.Position.Z)
 end
-
----------------------------------------------------------------------
--- PLANT FUNCTION
----------------------------------------------------------------------
 
 local function PlantOnce()
     local plantName = GetHeldPlant()
@@ -407,17 +299,6 @@ local function PlantOnce()
     PlantRemote:InvokeServer(plantName, pos)
 end
 
----------------------------------------------------------------------
--- UI CONTROLS
----------------------------------------------------------------------
-
-local PlanterBox = PlantSection:Section({
-    Title = "Auto Planter",
-    Box = true,
-    Opened = true,
-})
-
--- Manual plant button
 PlanterBox:Button({
     Title = "Plant Held Seed",
     Justify = "Center",
@@ -428,7 +309,6 @@ PlanterBox:Button({
 
 PlanterBox:Space()
 
--- Auto planter toggle
 PlanterBox:Toggle({
     Title = "Auto Planter",
     Callback = function(state)
@@ -445,9 +325,6 @@ PlanterBox:Toggle({
     end
 })
 
-PlanterBox:Space()
-
--- Delay slider
 PlanterBox:Slider({
     Title = "Plant Delay",
     Step = 0.1,
@@ -460,4 +337,57 @@ PlanterBox:Slider({
         AutoPlantDelay = v
     end
 })
+
+---------------------------------------------------------------------
+-- PLANT BUY SECTIONS (LOOP)
+---------------------------------------------------------------------
+
+for _, plant in pairs(PlantsFolder:GetChildren()) do
+
+    local plantName = plant.Name
+
+    local PlantBox = PlantSection:Section({
+        Title = plantName,
+        Box = true,
+        Opened = false,
+    })
+
+    local amount = 1
+    local autoBuy = false
+
+    PlantBox:Slider({
+        Title = "Amount",
+        Step = 1,
+        Value = { Min = 1, Max = 50, Default = 1 },
+        Callback = function(v)
+            amount = v
+        end
+    })
+
+    PlantBox:Button({
+        Title = "Buy Seed",
+        Justify = "Center",
+        Callback = function()
+            for i = 1, amount do
+                PurchaseRemote:InvokeServer("SeedShop", plantName.." Seed")
+                task.wait(0.15)
+            end
+        end
+    })
+
+    PlantBox:Toggle({
+        Title = "Auto Buy",
+        Callback = function(state)
+            autoBuy = state
+            if autoBuy then
+                task.spawn(function()
+                    while autoBuy do
+                        PurchaseRemote:InvokeServer("SeedShop", plantName.." Seed")
+                        task.wait(1)
+                    end
+                end)
+            end
+        end
+    })
+
 end
