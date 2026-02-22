@@ -129,3 +129,114 @@ SellSection:Slider({
         AutoSellDelay = value
     end
 })
+
+---------------------------------------------------------------------
+-- GEARS TAB
+---------------------------------------------------------------------
+
+local TabGears = Window:Tab({
+    Title = "Gears",
+    Icon = "solar:settings-bold",
+})
+
+local GearSection = TabGears:Section({
+    Title = "Gear Shop",
+})
+
+-- load GearDefinitions module
+local GearModule = require(
+    ReplicatedStorage:WaitForChild("Definitions"):WaitForChild("GearDefinitions")
+)
+
+local GearList = GearModule.Gears
+
+---------------------------------------------------------------------
+-- SETTINGS
+---------------------------------------------------------------------
+
+local AutoBuyStates = {}
+local BuyAmounts = {}
+
+-- ⚠️ change this remote if your game uses another one
+local BuyRemote = ReplicatedStorage
+    :WaitForChild("RemoteEvents")
+    :WaitForChild("BuyGear")
+
+local function BuyGear(gearName, amount)
+    for i = 1, amount do
+        BuyRemote:InvokeServer(gearName)
+        task.wait(0.1)
+    end
+end
+
+---------------------------------------------------------------------
+-- CREATE UI FOR EACH GEAR AUTOMATICALLY
+---------------------------------------------------------------------
+
+for gearName, data in pairs(GearList) do
+
+    AutoBuyStates[gearName] = false
+    BuyAmounts[gearName] = 1
+
+    local GearBox = GearSection:Section({
+        Title = gearName .. " (" .. data.Rarity .. ")",
+        Box = true,
+        Opened = false,
+    })
+
+    -----------------------------------------------------------------
+    -- Amount Slider
+    -----------------------------------------------------------------
+
+    GearBox:Slider({
+        Title = "Amount",
+        Step = 1,
+        Value = {
+            Min = 1,
+            Max = 50,
+            Default = 1,
+        },
+        Callback = function(value)
+            BuyAmounts[gearName] = value
+        end
+    })
+
+    GearBox:Space()
+
+    -----------------------------------------------------------------
+    -- Single Buy Button
+    -----------------------------------------------------------------
+
+    GearBox:Button({
+        Title = "Buy Once",
+        Icon = "solar:cart-large-2-bold",
+        Justify = "Center",
+        Callback = function()
+            BuyGear(gearName, BuyAmounts[gearName])
+        end
+    })
+
+    GearBox:Space()
+
+    -----------------------------------------------------------------
+    -- Auto Buy Toggle
+    -----------------------------------------------------------------
+
+    GearBox:Toggle({
+        Title = "Auto Buy",
+        Value = false,
+        Callback = function(state)
+            AutoBuyStates[gearName] = state
+
+            if state then
+                task.spawn(function()
+                    while AutoBuyStates[gearName] do
+                        BuyGear(gearName, BuyAmounts[gearName])
+                        task.wait(1)
+                    end
+                end)
+            end
+        end
+    })
+
+end
